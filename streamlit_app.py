@@ -53,7 +53,7 @@ set_styles()
 @st.cache_resource
 def load_model_files():
     try:
-        gmm = joblib.load('gmm_model.joblib')
+        gmm = joblib.load('gmm_model_1.joblib')
         scaler = joblib.load('scaler.joblib')
         profiles = pd.read_csv('cluster_profiles.csv', index_col='Cluster')
         return gmm, scaler, profiles
