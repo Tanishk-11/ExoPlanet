@@ -15,7 +15,7 @@ def set_styles():
         img_base64 = get_base64_of_bin_file("background.jpg")
         page_bg_img = f"""
         <style>
-        /* --- General & Background --- */
+        /* CSS styles remain the same */
         #MainMenu {{visibility: hidden;}}
         header {{visibility: hidden;}}
         .stApp {{
@@ -24,20 +24,14 @@ def set_styles():
             background-repeat: no-repeat;
             background-attachment: fixed;
         }}
-        
-        /* --- Text Styling --- */
         h1, h2, h3, p, label, .st-emotion-cache-1tplte7 p {{
             color: white;
         }}
-        
-        /* --- Container Styling --- */
         div[data-testid="stForm"], div[data-testid="stExpander"] {{
              background-color: rgba(0, 0, 0, 0.7);
              border-radius: 10px;
              padding: 20px;
         }}
-        
-        /* --- Button Styling --- */
         div[data-testid="stForm"] button {{
             background-color: #008CBA;
             color: white;
@@ -59,7 +53,7 @@ set_styles()
 @st.cache_resource
 def load_model_files():
     try:
-        gmm = joblib.load('gmm_model_1.joblib')
+        gmm = joblib.load('gmm_model.joblib')
         scaler = joblib.load('scaler.joblib')
         profiles = pd.read_csv('cluster_profiles.csv', index_col='Cluster')
         return gmm, scaler, profiles
@@ -68,7 +62,9 @@ def load_model_files():
 
 gmm, scaler, profiles = load_model_files()
 
-def interpret_cluster_profile(profile):
+# --- Updated Interpretation Function ---
+def interpret_cluster_profile(profile, new_planet_temp):
+    # Cluster-level interpretation
     mass = profile['Mass']
     radius = profile['Radius']
     temp = profile['Temperature']
@@ -84,36 +80,37 @@ def interpret_cluster_profile(profile):
     elif mass < 2 and radius < 1.5:
         interpretation = "This cluster represents small, rocky worlds, potentially similar to Earth or Mars."
 
-    habitability = "The average temperature of this group is outside the traditional habitable zone."
-    if 273 <= temp <= 373:
-        habitability = "Notably, the average temperature of this group is in the 'Habitable Zone,' where liquid water could potentially exist."
+    # Habitability assessment for the specific planet
+    habitability_insight = ""
+    if 273 <= new_planet_temp <= 373:
+        habitability_insight = "This specific planet's temperature falls within the 'Habitable Zone,' where liquid water could potentially exist."
+    else:
+        habitability_insight = "This specific planet's temperature is outside the traditional habitable zone."
         
-    return interpretation, habitability
+    return interpretation, habitability_insight
 
+# --- Main App Layout ---
 st.title("🪐 Exoplanet Classifier")
 st.write("Enter the properties of a planet to predict which cluster it belongs to and see its likely characteristics.")
 
 if gmm is None:
-    st.error("Model files not found! Please ensure gmm_model.joblib, scaler.joblib, and cluster_profiles.csv are in the same folder.")
+    st.error("Model files not found! Please ensure all model files are in the same folder.")
 else:
     with st.form("planet_form"):
         st.header("Input Planet Data")
-        
         col1, col2 = st.columns(2)
         with col1:
-            mass = st.number_input("Mass (in Earth Masses)", min_value=0.1, value=1.0, step=0.1)
-            radius = st.number_input("Radius (in Earth Radii)", min_value=0.1, value=1.0, step=0.1)
-            temp = st.number_input("Equilibrium Temperature (K)", min_value=1, value=300, step=10)
-        
+            mass_input = st.number_input("Mass (in Earth Masses)", min_value=0.1, value=1.0, step=0.1)
+            radius_input = st.number_input("Radius (in Earth Radii)", min_value=0.1, value=1.0, step=0.1)
+            temp_input = st.number_input("Equilibrium Temperature (K)", min_value=1, value=300, step=10)
         with col2:
-            period = st.number_input("Orbital Period (days)", min_value=0.1, value=365.0, step=1.0)
-            stellar_temp = st.number_input("Host Star Temperature (K)", min_value=1000, value=5700, step=100)
-        
+            period_input = st.number_input("Orbital Period (days)", min_value=0.1, value=365.0, step=1.0)
+            stellar_temp_input = st.number_input("Host Star Temperature (K)", min_value=1000, value=5700, step=100)
         submitted = st.form_submit_button("Classify Planet")
 
     if submitted:
         features = ['Mass', 'Radius', 'Temperature', 'Orbital Period', 'Stellar Temperature']
-        planet_data = {'Mass': mass, 'Radius': radius, 'Temperature': temp, 'Orbital Period': period, 'Stellar Temperature': stellar_temp}
+        planet_data = {'Mass': mass_input, 'Radius': radius_input, 'Temperature': temp_input, 'Orbital Period': period_input, 'Stellar Temperature': stellar_temp_input}
         
         new_planet_df = pd.DataFrame([planet_data], columns=features)
         new_planet_scaled = scaler.transform(new_planet_df)
@@ -121,15 +118,16 @@ else:
         predicted_cluster = gmm.predict(new_planet_scaled)[0]
         cluster_profile = profiles.loc[predicted_cluster]
         
-        interpretation, habitability = interpret_cluster_profile(cluster_profile)
+        # Pass the specific planet's temperature to the interpretation function
+        interpretation, habitability = interpret_cluster_profile(cluster_profile, temp_input)
         
         st.header("Prediction Result")
         st.success(f"This new planet belongs to **Cluster {predicted_cluster}**.")
         
         st.subheader("Cluster Interpretation")
+        # Display the more nuanced habitability insight
         st.info(f"**Interpretation:** {interpretation}\n\n**Habitability Insight:** {habitability}")
         
-        # --- The New, Corrected Display Method ---
         with st.expander("Show Cluster Profile (Average Values)"):
             cols = st.columns(5)
             cols[0].metric("Mass (Earths)", f"{cluster_profile['Mass']:.2f}")
